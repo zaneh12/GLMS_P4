@@ -45,20 +45,36 @@ head(asn4_dta)
 coef(mn_fit_2)
 prov_range = c(min(asn4_dta$provnum):max(asn4_dta$provnum))
 los_range = c(min(asn4_dta$los):max(asn4_dta$los))
-predictions = data.frame(provnum = median(asn4_dta$provnum),
+
+pred_for_los = data.frame(provnum = median(asn4_dta$provnum),
                          died = 1, 
                          white = 1, 
                          los = los_range)
-pred_obs = predict(mn_fit_2,
-        newdata=predictions, type = "response")
 
-# plot(prov_range,pred_obs[,1],type="l",lty=1,ylim=range(pred_obs),ylab="p")
-# lines(prov_range,pred_obs[,2],lty=2)
-# lines(prov_range,pred_obs[,3],lty=3)
+pred_for_prov = data.frame(provnum = prov_range,
+                         died = 1, 
+                         white = 1, 
+                         los = median(asn4_dta$los))
 
-plot(los_range,pred_obs[,1],type="l",lty=1,ylim=range(pred_obs),ylab="p")
-lines(los_range,pred_obs[,2],lty=2)
-lines(los_range,pred_obs[,3],lty=3)
+pred_prov_obs = predict(mn_fit_2,
+        newdata=pred_for_prov, type = "response")
+
+pred_los_obs = predict(mn_fit_2,
+        newdata=pred_for_los, type = "response")
+
+plot(prov_range,pred_prov_obs[,1],type="l",lty=1,ylim=range(pred_obs),ylab="p", main = "Interaction Effect of Change in Hospital ID #", col = ('red'))
+lines(prov_range,pred_prov_obs[,2],lty=2, col = "blue")
+lines(prov_range,pred_prov_obs[,3],lty=3, col = "green")
+legend(31250,.6,legend=c("Elective","Emergency","Urgent"),
+       col=c("red", "blue", "green"), lty=1:3, cex=0.8)
+
+
+plot(los_range,pred_los_obs[,1],type="l",lty=1,ylim=range(pred_obs),ylab="p",main = "Interaction Effect of Change Length of Stay", col = ('red'))
+lines(los_range,pred_los_obs[,2],lty=2, col = "blue")
+lines(los_range,pred_los_obs[,3],lty=3, col = 'green')
+legend(75, 0.6, legend=c("Elective","Emergency","Urgent"),
+       col=c("red", "blue", "green"), lty=1:3, cex=0.8)
+
 
 summary(mn_fit_2)
 
@@ -73,15 +89,53 @@ mn_nnet2 = multinom(formula = admission ~ provnum + died + white + los , data = 
 
 
 ```{r}
-pred_dta = predict(mn_nnet2,type="probs")
-head(pred_dta)
-x = asn4_dta$provnum + asn4_dta$los
+
+
+medians_dta = data.frame(provnum = median(asn4_dta$provnum),
+                         died = c(0,1,0,1), 
+                         white = c(0,1,1,0), 
+                         los = median(asn4_dta$los))
+median_preds = predict(mn_fit_2,
+        newdata=medians_dta, type = "response")
+
+rownames(median_preds) = c("Survive & Non White", "Died & White",
+                           "Survive & White", "Died and Non White")
+median_preds
 ```
 
+## Model Selection in a useless slow way...
 
+```{r}
+step(mn_nnet2, direction = "both")
+```
 
+```{r}
+mn_nnet2.resid<-residuals(mn_nnet2)
+mn_nnet2.fitted<-fitted(mn_nnet2)
+mn_nnet2.observed<-mn_nnet2.fitted+mn_nnet2.resid
+par(mfrow=c(1,3))
+for(i in 1:3){
+  plot(mn_nnet2.fitted[,i],mn_nnet2.observed[,i],main=colnames(mn_nnet2.fitted)[i],xlab="fitted p",ylab="observed p")
+  abline(a=0,b=1)
+  lines(smooth.spline(mn_nnet2.fitted[,i],mn_nnet2.observed[,i],df=4),col="red",lty=2)
+}
+```
+## Deviance?
 
+```{r}
+dev = deviance(mn_nnet2)
+n = dim(asn4_dta)[1]
+p = length(coef(mn_nnet2))
+1-pchisq(dev,(3-1)*n-p)
 
+mn_fit_2 = vglm(formula = admission ~ provnum + died + white + los , family = multinomial(refLevel = 1), 
+    data = asn4_dta)
+
+mn_null = vglm(formula = admission ~ 1,family = multinomial(refLevel = 1), 
+    data = asn4_dta)
+#R^2 Mcfadden
+1-logLik(mn_fit_2)/logLik(mn_null)
+```
 
 
 
