@@ -1,0 +1,91 @@
+---
+title: "Assginment 4 GLMS"
+author: "Zane Hassoun"
+date: "11/20/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+setwd("C:/Users/zaneh/OneDrive/Documents/")
+knitr::opts_chunk$set(echo = TRUE)
+library(effects)
+library(VGAM)
+library(car)
+library(ggplot2)
+library(nnet)
+asn4_dta <- read.csv("admissions.csv")
+asn4_dta$admission = factor(asn4_dta$admission)
+
+
+```
+
+
+
+```{r}
+
+mn_fit_1 = vglm(formula = admission ~ provnum + died + white + los + age + age80, family = multinomial(refLevel = 1), 
+    data = asn4_dta)
+Anova(mn_fit_1)
+
+```   
+
+### Using the Anova Test we see that neither Age nor Age 80 are significant so we will exclude it from the model
+
+```{r}
+mn_fit_2 = vglm(formula = admission ~ provnum + died + white + los , family = multinomial(refLevel = 1), 
+    data = asn4_dta)
+
+Anova(mn_fit_2)
+
+summary(mn_fit_2)
+```
+
+```{r}
+head(asn4_dta)
+coef(mn_fit_2)
+prov_range = c(min(asn4_dta$provnum):max(asn4_dta$provnum))
+los_range = c(min(asn4_dta$los):max(asn4_dta$los))
+predictions = data.frame(provnum = median(asn4_dta$provnum),
+                         died = 1, 
+                         white = 1, 
+                         los = los_range)
+pred_obs = predict(mn_fit_2,
+        newdata=predictions, type = "response")
+
+# plot(prov_range,pred_obs[,1],type="l",lty=1,ylim=range(pred_obs),ylab="p")
+# lines(prov_range,pred_obs[,2],lty=2)
+# lines(prov_range,pred_obs[,3],lty=3)
+
+plot(los_range,pred_obs[,1],type="l",lty=1,ylim=range(pred_obs),ylab="p")
+lines(los_range,pred_obs[,2],lty=2)
+lines(los_range,pred_obs[,3],lty=3)
+
+summary(mn_fit_2)
+
+```
+## Trying to understand the effects package
+
+```{r}
+mn_nnet2 = multinom(formula = admission ~ provnum + died + white + los , data = asn4_dta)
+# plot(effect("provnum", mn_nnet2),style = "stacked")
+# plot(effect("los", mn_nnet2),style = "stacked")
+```
+
+
+```{r}
+pred_dta = predict(mn_nnet2,type="probs")
+head(pred_dta)
+x = asn4_dta$provnum + asn4_dta$los
+```
+
+
+
+
+
+
+
+
+
+
+
+
